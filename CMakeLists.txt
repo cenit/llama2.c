@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 
+option(CMAKE_VERBOSE_MAKEFILE "Create verbose makefile" ON)
+option(ENABLE_FASTMATH "Enable Ofast optimizations (only clang/gcc and release builds)" OFF)
+
 if(DEFINED ENV{VCPKG_DEFAULT_TRIPLET})
   message(STATUS "Setting default vcpkg target triplet to $ENV{VCPKG_DEFAULT_TRIPLET}")
   set(VCPKG_TARGET_TRIPLET $ENV{VCPKG_DEFAULT_TRIPLET})
@@ -34,6 +37,33 @@ endif()
 project(llama2c VERSION ${VERSION_STRING})
 
 enable_language(C)
+
+if(CMAKE_COMPILER_IS_GNUCC OR "${CMAKE_C_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
+  set(CMAKE_COMPILER_IS_GNUCC_OR_CLANG TRUE)
+  if("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" OR "${CMAKE_CXX_COMPILER_ID}" MATCHES "clang")
+    set(CMAKE_COMPILER_IS_CLANG TRUE)
+  else()
+    set(CMAKE_COMPILER_IS_CLANG FALSE)
+  endif()
+else()
+  set(CMAKE_COMPILER_IS_GNUCC_OR_CLANG FALSE)
+  set(CMAKE_COMPILER_IS_CLANG FALSE)
+endif()
+
+set(default_build_type "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCC_OR_CLANG AND ENABLE_FASTMATH)
+  string(REGEX REPLACE "-O3" "-Ofast" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+  string(REGEX REPLACE "-O3" "-Ofast" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+endif()
 
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_LIST_DIR}" CACHE PATH "Install prefix" FORCE)
