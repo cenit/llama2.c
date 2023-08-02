@@ -2,123 +2,116 @@ name: Continuous Integration
 
 on:
   push:
-    branches:
-      - master
-    paths: ['.github/workflows/**', '**/Makefile', '**/*.c', '**/*.h']
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths: ['**/Makefile', '**/*.c', '**/*.h']
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+  schedule:
+    - cron: '0 0 * * *'
 
-env:
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  VCPKG_BINARY_SOURCES: 'clear;nuget,vcpkgbinarycache,readwrite'
 
 jobs:
-  # check basic builds to avoid breaking changes
-  ubuntu-focal-make:
+  ubuntu:
     runs-on: ubuntu-20.04
-
     steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v2
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+    - uses: lukka/get-cmake@latest
+    - name: Update apt
+      run: sudo apt-get update
+    - name: Install dependencies
+      run: sudo apt-get install build-essential -y
+    - name: 'Setup vcpkg and NuGet artifacts backend'
+      shell: bash
+      run: >
+        git clone https://github.com/microsoft/vcpkg ;
+        ./vcpkg/bootstrap-vcpkg.sh ;
+        mono $(./vcpkg/vcpkg fetch nuget | tail -n 1) sources add
+        -Name "vcpkgbinarycache"
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Setup NuGet API key if found
+      shell: bash
+      env:
+        BAGET_API_KEY: ${{ secrets.BAGET_API_KEY }}
+      if: env.BAGET_API_KEY != null
+      run: >
+        mono $(./vcpkg/vcpkg fetch nuget | tail -n 1)
+        setapikey ${{ secrets.BAGET_API_KEY }}
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build . --target install
 
-      - name: Dependencies
-        id: depends
-        run: |
-          sudo apt-get update
-          sudo apt-get install build-essential -y
-
-      - name: Build
-        id: make_build
-        run: |
-          make
-
-      - name: Build runfast
-        id: make_build_runfast
-        run: |
-          make runfast
-
-  macOS-latest-make:
+  osx:
     runs-on: macos-latest
-
     steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v2
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+    - name: Install dependencies
+      run: brew install libomp yasm nasm pkg-config
+    - uses: lukka/get-cmake@latest
+    - name: 'Setup vcpkg and NuGet artifacts backend'
+      shell: bash
+      run: >
+        git clone https://github.com/microsoft/vcpkg ;
+        ./vcpkg/bootstrap-vcpkg.sh ;
+        mono $(./vcpkg/vcpkg fetch nuget | tail -n 1) sources add
+        -Name "vcpkgbinarycache"
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Setup NuGet API key if found
+      shell: bash
+      env:
+        BAGET_API_KEY: ${{ secrets.BAGET_API_KEY }}
+      if: env.BAGET_API_KEY != null
+      run: >
+        mono $(./vcpkg/vcpkg fetch nuget | tail -n 1)
+        setapikey ${{ secrets.BAGET_API_KEY }}
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build . --target install
 
-      - name: Dependencies
-        id: depends
-        continue-on-error: true
-        run: |
-          brew update
-
-      - name: Build
-        id: make_build
-        run: |
-          make
-
-      - name: Build runfast
-        id: make_build_runfast
-        run: |
-          make runfast
-
-      - name: Build clang
-        id: make_build_clang
-        run: |
-          make run CC=clang
-
-  windows-latest-make:
+  win:
     runs-on: windows-latest
-
-    strategy:
-      matrix:
-        arch:
-          - amd64
-          - amd64_x86
-          - amd64_arm64
-
     steps:
-      - name: Clone
-        id: checkout
-        uses: actions/checkout@v3
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v1
-
-      - name: Setup MSVC ${{ matrix.arch }}
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{ matrix.arch }}
-
-      - name: Build ${{ matrix.arch }}
-        id: build_msvc
-        run: |
-          .\build_msvc.bat
-
-  windows-latest-mingw:
-    runs-on: windows-latest
-
-    defaults:
-      run:
-        shell: msys2 {0}
-
-    strategy:
-      matrix:
-        include:
-          - { sys: mingw64, env: x86_64 }
-
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v3
-
-      - uses: msys2/setup-msys2@v2
-        id: setup-msys2
-        with:
-          msystem: ${{ matrix.sys }}
-          install: mingw-w64-${{matrix.env}}-gcc make
-
-      - name: Build ${{ matrix.sys }} ${{ matrix.env }}
-        id: build_mingw
-        run: |
-          make win64
+    - uses: actions/checkout@v2
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
+    - uses: lukka/get-cmake@latest
+    - name: 'Setup vcpkg and NuGet artifacts backend'
+      shell: bash
+      run: >
+        git clone https://github.com/microsoft/vcpkg ;
+        ./vcpkg/bootstrap-vcpkg.sh ;
+        $(./vcpkg/vcpkg fetch nuget | tail -n 1) sources add
+        -Name "vcpkgbinarycache"
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Setup NuGet API key if found
+      shell: bash
+      env:
+        BAGET_API_KEY: ${{ secrets.BAGET_API_KEY }}
+      if: env.BAGET_API_KEY != null
+      run: >
+        $(./vcpkg/vcpkg fetch nuget | tail -n 1)
+        setapikey ${{ secrets.BAGET_API_KEY }}
+        -Source http://93.49.111.10:5555/v3/index.json
+    - name: Build
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        cmake --build . --target install

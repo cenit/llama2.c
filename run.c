@@ -14,11 +14,11 @@ $ ./run
 #include <math.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 #if defined _WIN32
     #include "win.h"
 #else
     #include <unistd.h>
-    #include <sys/mman.h>
 #endif
 // ----------------------------------------------------------------------------
 // Transformer and RunState structs, and related memory management
@@ -89,8 +89,8 @@ void malloc_run_state(RunState* s, Config* p) {
     s->key_cache = calloc(p->n_layers * p->seq_len * p->dim, sizeof(float));
     s->value_cache = calloc(p->n_layers * p->seq_len * p->dim, sizeof(float));
     // ensure all mallocs went fine
-    if (!s->x || !s->xb || !s->xb2 || !s->hb || !s->hb2 || !s->q 
-     || !s->k || !s->v || !s->att || !s->logits || !s->key_cache 
+    if (!s->x || !s->xb || !s->xb2 || !s->hb || !s->hb2 || !s->q
+     || !s->k || !s->v || !s->att || !s->logits || !s->key_cache
      || !s->value_cache) {
         printf("malloc failed!\n");
         exit(1);
@@ -258,7 +258,7 @@ void transformer(int token, int pos, Config* p, RunState* s, TransformerWeights*
         float* value_cache_row = s->value_cache + loff + pos * dim;
         memcpy(key_cache_row, s->k, dim*sizeof(*key_cache_row));
         memcpy(value_cache_row, s->v, dim*sizeof(*value_cache_row));
-        
+
         // multihead attention. iterate over all heads
         int h;
         #pragma omp parallel for private(h)
@@ -312,7 +312,7 @@ void transformer(int token, int pos, Config* p, RunState* s, TransformerWeights*
         // first calculate self.w1(x) and self.w3(x)
         matmul(s->hb, s->xb, w->w1 + l*dim*hidden_dim, dim, hidden_dim);
         matmul(s->hb2, s->xb, w->w3 + l*dim*hidden_dim, dim, hidden_dim);
-        
+
         // F.silu; silu(x)=x*σ(x),where σ(x) is the logistic sigmoid
         for (int i = 0; i < hidden_dim; i++) {
             s->hb[i] = s->hb[i] * (1.0f / (1.0f + expf(-s->hb[i])));
@@ -329,7 +329,7 @@ void transformer(int token, int pos, Config* p, RunState* s, TransformerWeights*
         // residual connection
         accum(x, s->xb, dim);
     }
-    
+
     // final rmsnorm
     rmsnorm(x, x, w->rms_final_weight, dim);
 
@@ -351,7 +351,7 @@ int str_lookup(char *str, char **vocab, int vocab_size) {
 }
 
 void bpe_encode(char *text, char **vocab, float *vocab_scores, int vocab_size, unsigned int max_token_length, int *tokens, int *n_tokens) {
-    
+
     // a temporary buffer to merge two consecutive tokens
     char* str_buffer = malloc((max_token_length*2+1) * sizeof(char)); // *2 for concat, +1 for null terminator
 
