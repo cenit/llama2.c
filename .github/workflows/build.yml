@@ -1,6 +1,7 @@
 name: Continuous Integration
 
 on:
+  pull_request:
   push:
   workflow_dispatch:
     inputs:
@@ -9,15 +10,18 @@ on:
         required: false
         default: false
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 6 * * *'
 
+env:
   VCPKG_BINARY_SOURCES: 'clear;nuget,vcpkgbinarycache,readwrite'
 
 jobs:
   ubuntu:
     runs-on: ubuntu-20.04
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
     - name: Setup tmate session
       uses: mxschmitt/action-tmate@v3
       if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
@@ -45,6 +49,8 @@ jobs:
         -Source http://93.49.111.10:5555/v3/index.json
     - name: Build
       run: |
+        export VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg
+        ls $VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
         mkdir build
         cd build
         cmake ..
@@ -53,12 +59,12 @@ jobs:
   osx:
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
     - name: Setup tmate session
       uses: mxschmitt/action-tmate@v3
       if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
-    - name: Install dependencies
-      run: brew install libomp yasm nasm pkg-config
     - uses: lukka/get-cmake@latest
     - name: 'Setup vcpkg and NuGet artifacts backend'
       shell: bash
@@ -79,6 +85,8 @@ jobs:
         -Source http://93.49.111.10:5555/v3/index.json
     - name: Build
       run: |
+        export VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg
+        ls $VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
         mkdir build
         cd build
         cmake ..
@@ -87,28 +95,25 @@ jobs:
   win:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
     - name: Setup tmate session
       uses: mxschmitt/action-tmate@v3
       if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
     - uses: lukka/get-cmake@latest
-    - name: 'Setup vcpkg and NuGet artifacts backend'
+    - uses: seanmiddleditch/gha-setup-vsdevenv@master
+    - name: 'Setup NuGet artifacts backend'
       shell: bash
-      run: >
-        git clone https://github.com/microsoft/vcpkg ;
-        ./vcpkg/bootstrap-vcpkg.sh ;
-        $(./vcpkg/vcpkg fetch nuget | tail -n 1) sources add
-        -Name "vcpkgbinarycache"
-        -Source http://93.49.111.10:5555/v3/index.json
+      run: |
+        "$("${VCPKG_ROOT}/vcpkg" fetch nuget | tail -n 1)" sources add -Name "vcpkgbinarycache" -Source http://93.49.111.10:5555/v3/index.json
     - name: Setup NuGet API key if found
       shell: bash
       env:
         BAGET_API_KEY: ${{ secrets.BAGET_API_KEY }}
       if: env.BAGET_API_KEY != null
-      run: >
-        $(./vcpkg/vcpkg fetch nuget | tail -n 1)
-        setapikey ${{ secrets.BAGET_API_KEY }}
-        -Source http://93.49.111.10:5555/v3/index.json
+      run: |
+        "$("${VCPKG_ROOT}/vcpkg" fetch nuget | tail -n 1)" setapikey ${{ secrets.BAGET_API_KEY }} -Source http://93.49.111.10:5555/v3/index.json
     - name: Build
       run: |
         mkdir build

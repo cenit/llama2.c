@@ -44,8 +44,12 @@ set(INSTALL_LIB_DIR      "lib"                   CACHE PATH "Path where lib will
 set(INSTALL_INCLUDE_DIR  "include"               CACHE PATH "Path where headers will be installed ")
 set(INSTALL_CMAKE_DIR    "share/${PROJECT_NAME}" CACHE PATH "Path where cmake configs will be installed")
 
-find_path(MMAN_DIR NAMES sys/mman.h PATH_SUFFIXES mman REQUIRED)
-find_library(MMAN_LIB NAMES mman REQUIRED)
+if(WIN32)
+  find_path(MMAN_DIR NAMES sys/mman.h PATH_SUFFIXES mman REQUIRED)
+  find_library(MMAN_LIB NAMES mman REQUIRED)
+endif()
+find_library(MATH_LIBRARY m)
+find_package(OpenMP COMPONENTS C)
 
 set(CMAKE_PROJECT_NAME_SOURCES
   ${CMAKE_CURRENT_LIST_DIR}/run.c
@@ -59,8 +63,16 @@ if(WIN32)
 endif()
 
 add_executable(${CMAKE_PROJECT_NAME} ${CMAKE_PROJECT_NAME_SOURCES})
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${MMAN_DIR})
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${MMAN_LIB})
+if(WIN32)
+  target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${MMAN_DIR})
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${MMAN_LIB})
+endif()
+if(MATH_LIBRARY)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${MATH_LIBRARY})
+endif()
+if(OpenMP_C_FOUND)
+  target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
+endif()
 
 install(TARGETS ${CMAKE_PROJECT_NAME} DESTINATION "${INSTALL_BIN_DIR}")
 

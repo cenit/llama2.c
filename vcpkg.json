@@ -6,6 +6,9 @@
   "homepage": "https://github.com/cenit/llama2.c",
   "description": "Inference Llama 2 in one file of pure C",
   "dependencies": [
-    "mman"
+    {
+      "name": "mman",
+      "platform": "windows"
+    }
   ]
 }
