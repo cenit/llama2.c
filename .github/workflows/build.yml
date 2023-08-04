@@ -119,4 +119,4 @@ jobs:
         mkdir build
         cd build
         cmake ..
-        cmake --build . --target install
+        cmake --build . --target install --config Release
