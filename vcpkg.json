@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "llama2c",
   "version": "1.0.0",
-  "builtin-baseline": "0895a813036f4d189e2bdd1b62741744614347b4",
+  "builtin-baseline": "ad3bae57455a3c3ce528fcd47d8e8027d0498add",
   "homepage": "https://github.com/cenit/llama2.c",
   "description": "Inference Llama 2 in one file of pure C",
   "dependencies": [
